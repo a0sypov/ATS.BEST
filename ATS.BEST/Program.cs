@@ -124,6 +124,16 @@ namespace ATS.BEST
             builder.Services.AddHttpClient(); // for HttpClientFactory
             builder.Services.AddSingleton<OpenAIService>();
 
+            builder.Services.AddCors(options =>
+            {
+                options.AddDefaultPolicy(policy =>
+                {
+                    policy.WithOrigins("https://atsbest-app-20250407100350.braveglacier-1ed5cedb.westeurope.azurecontainerapps.io/") // your frontend port here
+                          .AllowAnyMethod()
+                          .AllowAnyHeader();
+                });
+            });
+
             var app = builder.Build();
 
             // Configure the HTTP request pipeline.
@@ -138,6 +148,7 @@ namespace ATS.BEST
             app.UseStaticFiles();
 
             app.UseRouting();
+            app.UseCors(); // Enable the CORS middleware
 
             app.UseAuthorization();
 
@@ -145,8 +156,6 @@ namespace ATS.BEST
                 name: "default",
                 pattern: "{controller=Home}/{action=Index}/{id?}");
             app.MapControllers();
-
-            
 
             app.Run();
         }

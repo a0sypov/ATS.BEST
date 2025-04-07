@@ -58,7 +58,7 @@ function handleFiles(files) {
         return;
     }
 
-    fetch("https://localhost:32777/api/routing/upload", {
+    fetch(`${window.location.origin}/api/routing/upload`, {
         method: "POST",
         body: formData,
     })

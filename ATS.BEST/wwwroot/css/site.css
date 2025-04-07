@@ -1,0 +1,162 @@
+html {
+  font-size: 14px;
+}
+@media (min-width: 768px) {
+  html {
+    font-size: 16px;
+  }
+}
+.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
+  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
+}
+html {
+  position: relative;
+  min-height: 100%;
+}
+body {
+  margin-bottom: 60px;
+}
+.container {
+    margin-right:0;
+    margin-left:0;
+    max-width:100%;
+}
+.pb-3 {
+    height: 80vh
+}
+
+.bordered {
+    border: 2px solid #808080;
+    border-radius: 0.5rem;
+    padding: 0.5rem;
+}
+
+.ats-best-body {
+    display: flex;
+    flex-direction: row;
+    gap: 1rem;
+    width:100%;
+    height: 100%;
+    overflow: hidden; /* Hide anything outside bounds */
+    box-sizing: border-box; /* Include padding/borders in sizing */
+}
+
+
+.jobs-list {
+    max-width: 50%;
+}
+
+.job-card h2 {
+    cursor:pointer;
+    border-radius: 0.5rem;
+    padding: 0.2rem;
+}
+
+.job-card h2:hover {
+    background: #cae8ff;
+}
+
+.job-details {
+    overflow: hidden; /* Ensures content doesn't overflow during transition */
+    max-height: 0; /* Start collapsed */
+    transition: max-height 0.3s ease-out; /* Smooth transition */
+    opacity: 0; /* Optional: Fade in effect */
+    transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
+}
+
+    .job-details.open {
+        max-height: 100%; /* Adjust to fit your content */
+        opacity: 1;
+    }
+
+
+.user-workspace {
+    display: flex;
+    flex-direction: column;
+    width:100%;
+    height:100%;
+    gap: 1rem;
+}
+
+.job-description-section {
+    border: 2px #999;
+    border-radius: 20px;
+    background: white;
+    height: 100%;
+}
+
+    .job-description-section textarea {
+        width:100%;
+        height:100%;
+        resize:none;
+        border: 0;
+        background: #f4f4f4;
+        border-radius: 20px;
+        padding: 1rem;
+    }
+
+.cv-input {
+    border: 2px dashed #999;
+    border-radius: 20px;
+    background: #e5ebff;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    transition: border-color 0.3s;
+    width: 100%;
+    height: 20%
+}
+
+    .cv-input:hover {
+        border-color: #666;
+    }
+
+    .cv-input input {
+        display: none;
+    }
+
+
+
+
+.ranked-result {
+    min-width: 30%;
+    overflow:auto;
+    overflow-wrap:break-word;
+}
+
+
+.tooltip-container {
+    position: relative;
+    display: inline-block;
+}
+
+.info-icon {
+    margin-left: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    vertical-align: middle;
+    position: relative;
+}
+
+.tooltip {
+    display: none;
+    position: absolute;
+    background-color: #f9f9f9;
+    color: #333;
+    border: 1px solid #ccc;
+    padding: 10px;
+    white-space: pre-wrap;
+    z-index: 10;
+    max-width: 400px;
+    font-size: 13px;
+    border-radius: 6px;
+    top: 20px;
+    left: 0;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.info-icon:hover .tooltip {
+    display: block;
+}

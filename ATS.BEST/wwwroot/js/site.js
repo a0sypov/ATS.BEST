@@ -58,7 +58,7 @@ function handleFiles(files) {
         return;
     }
 
-    fetch("https://localhost:32769/api/routing/upload", {
+    fetch("https://localhost:32777/api/routing/upload", {
         method: "POST",
         body: formData,
     })
@@ -92,7 +92,26 @@ function populateTable(data) {
             <td>${Number(score).toFixed(0)}%</td>
         `;
 
+        // Attach click listener to show the panel
+        row.addEventListener("click", () => {
+            showPanel(entry.aiEvaluation || "No AI evaluation provided.");
+        });
+
         tableBody.appendChild(row);
     });
 }
 
+function showPanel(text) {
+    const panel = document.getElementById("infoPanel");
+    const content = document.getElementById("panelContent");
+
+    content.innerHTML = text.replace(/\n/g, "<br>")
+
+    // content.textContent = text;
+    panel.classList.add("visible");
+}
+
+document.getElementById("closePanel").addEventListener("click", () => {
+    const panel = document.getElementById("infoPanel");
+    panel.classList.remove("visible");
+});

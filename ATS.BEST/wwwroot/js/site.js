@@ -115,3 +115,29 @@ document.getElementById("closePanel").addEventListener("click", () => {
     const panel = document.getElementById("infoPanel");
     panel.classList.remove("visible");
 });
+
+
+const connection = new signalR.HubConnectionBuilder()
+    .withUrl("/progressHub")
+    .build();
+
+connection.on("ReceiveProgress", function (message) {
+    showLoading(message);
+    if (message === "Done!") {
+        hideLoading();
+    }
+});
+
+connection.start();
+
+
+
+function showLoading(text = "Loading...") {
+    const container = document.getElementById("loadingContainer");
+    document.getElementById("loadingText").innerText = text;
+    container.style.display = "flex";
+}
+
+function hideLoading() {
+    document.getElementById("loadingContainer").style.display = "none";
+}

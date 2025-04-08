@@ -1,5 +1,7 @@
 using ATS.BEST.Services;
 
+using Microsoft.AspNetCore.SignalR;
+
 namespace ATS.BEST
 {
     public class CV
@@ -112,6 +114,15 @@ namespace ATS.BEST
         }
     }
 
+    public class ProgressHub : Hub
+    {
+        public async Task SendProgress(string message)
+        {
+            await Clients.All.SendAsync("ReceiveProgress", message);
+        }
+    }
+
+
     public class Program
     {
         public static void Main(string[] args)
@@ -123,6 +134,8 @@ namespace ATS.BEST
 
             builder.Services.AddHttpClient(); // for HttpClientFactory
             builder.Services.AddSingleton<OpenAIService>();
+
+            builder.Services.AddSignalR();
 
             builder.Services.AddCors(options =>
             {
@@ -155,6 +168,7 @@ namespace ATS.BEST
             app.MapControllerRoute(
                 name: "default",
                 pattern: "{controller=Home}/{action=Index}/{id?}");
+            app.MapHub<ProgressHub>("/progressHub");
             app.MapControllers();
 
             app.Run();

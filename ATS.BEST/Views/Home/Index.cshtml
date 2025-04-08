@@ -2,7 +2,13 @@
     ViewData["Title"] = "Home Page";
 }
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/7.0.5/signalr.min.js"></script>
+
 <div class="ats-best-body">
+    <div id="loadingContainer">
+        <div class="spinner"></div>
+        <div id="loadingText">Loading...</div>
+    </div>
 
     <div class="user-workspace bordered">
         
@@ -20,6 +26,7 @@
     </div>
 
     <div class="ranked-result bordered">
+        <div id="loadingText">Waiting...</div>
         <table class="table" id="resultsTable">
             <thead>
 

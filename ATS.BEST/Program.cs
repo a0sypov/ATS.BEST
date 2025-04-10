@@ -4,6 +4,21 @@ using Microsoft.AspNetCore.SignalR;
 
 namespace ATS.BEST
 {
+    public class KeywordGroups
+    {
+        public List<string> CoreRequirements { get; set; }
+        public List<string> PreferredQualifications { get; set; }
+        public List<string> NiceToHave { get; set; }
+
+        // ToString()
+        public override string ToString()
+        {
+            return $"Core Requirements: {string.Join(", ", CoreRequirements)}\n" +
+                   $"Preferred Qualifications: {string.Join(", ", PreferredQualifications)}\n" +
+                   $"Nice to Have: {string.Join(", ", NiceToHave)}";
+        }
+    }
+
     public class CV
     {
         public string name { get; set; }

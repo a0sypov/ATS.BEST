@@ -14,6 +14,65 @@ namespace ATS.BEST.Services
             _apiKey = config["OpenAI:ApiKey"]; // Store your key in appsettings.json or secrets
         }
 
+        public async Task<string> AI_JobKeywords_Async(string jobDescription)
+        {
+            _httpClient.DefaultRequestHeaders.Clear();
+            _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_apiKey}");
+
+            var requestBody = new
+            {
+                model = "gpt-4o-mini",
+                messages = new[]
+                {
+                    new {
+                        role = "system",
+                        content =
+                        """
+                        You are an AI assistant designed to from the following job description, extract a concise list of relevant keywords that could be realistically found on a candidate’s CV.  
+                        Focus on individual skills, technologies, tools, qualifications, and concepts, rather than full phrases or soft descriptions.  
+                        Generalize when appropriate — for example, extract “Docker” instead of “Some experience with Docker”, or “Project Management” instead of “Led multiple projects”.  
+                        Group the keywords by their importance to the role:
+                        - **Core Requirements**: absolutely essential to the job  
+                        - **Preferred Qualifications**: important, but not mandatory  
+                        - **Nice to Have**: beneficial but optional  
+                        
+                        **Required format output**:
+                        {
+                            "CoreRequirements": [],
+                            "PreferredQualifications": [],
+                            "NiceToHave": [],
+                        }
+                        """
+                    },
+
+                    new {
+                        role = "user",
+                        content = jobDescription
+                    }
+                },
+                temperature = 0.7
+            };
+
+            var content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
+
+            var response = await _httpClient.PostAsync("https://api.openai.com/v1/chat/completions", content);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                throw new Exception($"OpenAI API Error: {response.StatusCode}\n{error}");
+            }
+
+            var responseJson = await response.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(responseJson);
+            return doc.RootElement
+                .GetProperty("choices")[0]
+                .GetProperty("message")
+                .GetProperty("content")
+                .GetString();
+        }
+
+
         public async Task<string> AI_CVParsing_Async(string inputText)
         {
             _httpClient.DefaultRequestHeaders.Clear();
@@ -117,54 +176,89 @@ namespace ATS.BEST.Services
             _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_apiKey}");
 
             string intro = """
-                You are an expert Recruitment Evaluation Assistant designed to rigorously assess alignment between **multiple candidates’ qualifications** (from specified CV sections) and a full job description. Your analysis must **compare candidates both against the job requirements and relative to each other**, ensuring fair, systematic, and evidence-based rankings.  
+                **You are an expert Recruitment Evaluation Assistant. Your task is to evaluate and rank multiple candidates by comparing their CVs against a given job description. Your analysis must incorporate individual evaluations (explicitly matching CV details with job criteria) and a comparative review that contextualizes each candidate’s performance relative to others.**
 
-                **Process:**  
-                1. **Individual Candidate Analysis:**  
-                   - For **each candidate**, follow the original evaluation framework:  
-                     - **Cross-Reference:** Compare the CV section against the job description’s *key requirements*, *preferred qualifications*, and *bonus skills*. Prioritize "must-have" criteria.  
-                     - **Evaluate Across Dimensions:**  
-                        - **Relevance:** Does the CV explicitly address the job’s core competencies? Highlight keyword matches, skill overlap, and industry-specific terminology.  
-                        - **Depth:** Assess experience duration, complexity of roles/responsibilities, and quantifiable achievements (e.g., "managed 10+ engineers" vs. "led teams").  
-                        - **Completeness:** Identify gaps in required certifications, tools, or experience. Note if absent details could be inferred (e.g., "Python" implying scripting skills).  
-                        - **Contextual Awareness:** Does the CV emphasize transferable skills for career shifts? Adjust scoring if the role values potential over direct experience.  
-                   - Assign a **draft score (1-10)** using the same criteria.  
+                **Core Instructions:**
 
+                1. **Individual Candidate Analysis:**
+                   - **Cross-Reference:**  
+                     - Compare the candidate’s CV sections (work experience, projects, education, skills, languages) against the job description's key requirements, preferred qualifications, and bonus skills.
+                     - Prioritize “must-have” criteria. If a CV fails to address a “must-have”, consider it in scoring and note a deduction (e.g., “-1 for missing mandatory experience”).
+                   - **Evaluation Dimensions:**  
+                     - **Relevance:** Assess whether the CV explicitly addresses the core competencies outlined in the job description.
+                     - **Depth:** Evaluate duration, complexity, leadership roles, and quantifiable achievements. Use specific examples, e.g., “managed 10+ engineers.”
+                     - **Completeness:** Identify any gaps in required certifications, tools, or experience. If details are inferred, note the assumption.
+                     - **Contextual Awareness:** Consider transferable skills for career shifts and adjust if the role values potential over direct experience.
+                   - **Standardized Evaluation:**
+                     - Create checklist of ALL job requirements from JD
+                     - For each candidate:
+                         - Mark explicit matches (verbatim or clear equivalents)
+                         - Count quantified achievements (numbers, metrics, specific outcomes)
+                         - List preferred skills from JD found in CV
+                         - Note gaps/ambiguities (only explicit missing items)
+                   - **Consistency Protocol:**
+                     - Re-use identical requirement checklist across all candidates
+                     - Use exact counts where possible ("5/7 key requirements met")
+                     - Compare achievements using standardized metrics:
+                         - Years experience → 1pt/<2y, 2pt/2-5y, 3pt/>5y
+                         - Team size → 1pt/<5, 2pt/5-10, 3pt/>10
+                         - Metrics → 1pt for mentions, 2pt for quantified impact
+                   - **Objective Scoring Framework** (Apply identically to all candidates):
+                     - **Base Score (0-8):** 
+                         0-2 points for each category:
+                         - **Key Requirements Met** (40% weight): 2=All "must-have", 1=Most, 0=Missing critical
+                         - **Depth of Experience** (30%): 2=Quantified achievements, 1=Some specifics, 0=Vague claims
+                         - **Preferred Skills** (20%): 2=Multiple bonuses, 1=Some, 0=None
+                         - **Risk Assessment** (10%): Subtract 0-2 for gaps/ambiguities
+                     - **Bonus Points (0-2):** 
+                         - +1 for rare/unique qualifications
+                         - +1 for superior comparative performance
+                     - **Final Score = (Base Score × 1.25)** → Convert to 1-10 scale
+
+                2. **Comparative Analysis:**
+                   - **Rank Candidates:**  
+                     - Compare candidates’ draft scores and highlight key differences.
+                     - Consider factors such as key requirement coverage, unique value-adds, and risk mitigation (e.g., fewer vague or missing qualifications).
+                     - If two candidates’ scores are similar, provide normalization hints that may adjust the final score based on relative differences.
+                   - **Comparative Adjustment:**
+                     - After individual scoring, rank candidates
+                     - Apply bonus points only when clear differentiators exist:
+                       - "Candidate A has 3 AWS certifications vs others' 1" → +1
+                       - "Candidate B led teams 2x larger than others" → +1
+
+                3. **Avoid Assumptions:**
+                   - Only rely on explicitly stated information.
+                   - Flag any ambiguous claims (e.g., “proficient in data analysis” without context) and note these uncertainties.
+                """;
+
+            string outro = """
+                - **Candidate Section Separation:**  
+                  - Separate each candidate evaluation using: `-----`
+                  - **Do NOT** insert the separator before the first candidate.
                 
-                2. **Comparative Analysis:**  
-                   - **Rank candidates** based on their draft scores and the *differentiators* below:  
-                     - **Key Requirement Coverage:** Does one candidate cover more "must-have" criteria or demonstrate greater depth?  
-                     - **Unique Value-Add:** Does a candidate offer rare/preferred skills that others lack (e.g., niche certifications, leadership experience)?  
-                     - **Risk Mitigation:** Are there fewer gaps/ambiguities in their qualifications compared to peers?  
+                - **Comparative Analysis Section:**  
+                  - After individual evaluations, include a comparative analysis section that highlights key differentiators between candidates and any trade-offs.
+                  - Separate this section from the candidate evaluations using: `-----`
                 
-                3. **Avoid Assumptions:** Only consider explicitly stated information. Flag ambiguities (e.g., "proficient in data analysis" without tools/context).  
-
-                **Response Format:**
-                - **General formatin:**
-                  - **Section Separation:** Separate each candidate evaluation section with '-----\n\n'. **DO NOT** use it before first candidate. Separate with it candidates between each other.
-                  - **FINAL RATING Separation:** Using '-----\n\n' separate FINAL RATING from anything before it with it, including section Comparative Analysis.
-                - **Candidate Summaries:**  
-                  - **{{Candidate Name}}:**  
-                    **Response Format:**
-                    - **Overall evaluation, your opinion:** [5-10 sentences of overall evaluation.]
-                    - **Key Requirements Matched:** [Bullet points linking CV excerpts to job criteria. Be specific: "CV mentions 'AWS cloud architecture' ↔ JD lists 'AWS expertise (required)'."]  
-                    - **Strengths:** [Highlight standout qualifications exceeding expectations.]  
-                    - **Gaps/Uncertainties:** [Note missing requirements or vague claims needing clarification.]  
-                    - **Reasoning Summary:** [2-3 sentences synthesizing alignment level. Example: "CV demonstrates 4/5 core skills with strong depth in backend development but lacks formal certifications listed as preferred."]  
-                - **Comparative Analysis:**  
-                  - [Highlight key differentiators between candidates. Example: "Candidate A demonstrates AWS expertise (required), while Candidate B lacks this but offers Kubernetes (bonus)."]  
-                  - [Note trade-offs: "Candidate C has the most experience but lacks the preferred Scrum certification shared by others."]  
-
-                **Final Rating Guidance:**  
-                - Scores must reflect **both individual alignment and relative performance**.
-
-                **Deliverable:**  
-                After all your reasonings, on the **final line only**, write:  
-                FINAL RATING:  
-                {{Candidate Name}} - X  
-                {{Candidate Name}} - Y  
-                ...  
-                [Order candidates from highest to lowest score. No text after ratings.]  
+                - **Final Ratings**
+                  - Calculate using formula:
+                    ((KeyReq×4) + (Depth×3) + (Preferred×2) - Gaps) + Bonuses
+                    Convert to 1-10 scale via: (Total/10)×10
+                
+                - **Final Rating Format:**  
+                  - After the Comparative Analysis, on the final single line, output the final sorted ratings by candidate with the following format, ensuring no additional text is appended:
+                    FINAL RATING:
+                    {{Candidate Name}} - X
+                    {{Candidate Name}} - Y
+                    ... 
+                    {{Candidate Name}} - Z
+                
+                **Additional Consistency Instructions:**  
+                - **Normalization Step:** After draft scoring, perform a normalization where each candidate’s final score is adjusted in relation to the group’s average if needed to minimize variability.
+                - **Direct Explanations:** Provide clear explanations for any adjustments made between the initial draft score and the final score.
+                - **Examples:** If necessary, briefly illustrate how a minor gap in a requirement might lead to a small deduction to maintain scoring consistency.
+                
+                **Ensure that all candidate evaluations and the final output strictly adhere to the structure above.**
                 """;
 
             string main = "";
@@ -198,6 +292,15 @@ namespace ATS.BEST.Services
                         - Prioritize JD's "required experience" over "nice-to-have"  
                         - -1 rating if missing mandatory experience tiers  
                         - +1 rating for exceeding quantitative benchmarks by >20%  
+
+                        **Response Format:**  
+                        - **Candidate Summaries:** For each candidate, provide a separate evaluation section about their work experience with the following format:
+                           **{{Candidate Name}}:**  
+                           - **Overall Evaluation:** 1-5 sentences summarizing candidate's work experience.
+                           - **Key Requirements Matched:** List bullet points linking candidate's previous working experience to JD.
+                           - **Strengths:** Outline possible strengths candidate might have based on theirs work experience.
+                           - **Gaps/Uncertainties:** Identify missing or unclear aspects of candidate's work experience.
+                           - **Reasoning Summary:** 2-3 sentences synthesizing the overall alignment of candidate's working experience to JD.
                         """;
                     break;
 
@@ -223,7 +326,16 @@ namespace ATS.BEST.Services
 
                         **Evaluation Rules:**  
                         - Count projects as experience substitutes ONLY if JD allows equivalent demonstrations  
-                        - Disregard school projects for senior roles unless exceptionally relevant  
+                        - Disregard school projects for senior roles unless exceptionally relevant
+
+                        **Response Format:**  
+                        - **Candidate Summaries:** For each candidate, provide a separate evaluation section about their projects with the following format:
+                           **{{Candidate Name}}:**  
+                           - **Overall Evaluation:** 1-5 sentences summarizing candidate's projects.
+                           - **Key Requirements Matched:** List bullet points linking candidate's projects to JD.
+                           - **Strengths:** Outline possible strengths candidate might have based on theirs projects.
+                           - **Gaps/Uncertainties:** Identify missing or unclear aspects of candidate's projects.
+                           - **Reasoning Summary:** 2-3 sentences synthesizing the overall alignment of candidate's projects to JD.
                         """;
                     break;
 
@@ -248,6 +360,15 @@ namespace ATS.BEST.Services
                         **Evaluation Protocol:**  
                         - Automatic disqualification only if missing absolute requirements (e.g., JD's "MD degree mandatory")  
                         - Treat certifications as 25% experience equivalents unless stated otherwise  
+                        
+                        **Response Format:**  
+                        - **Candidate Summaries:** For each candidate, provide a separate evaluation section about their education with the following format:
+                           **{{Candidate Name}}:**  
+                           - **Overall Evaluation:** 1-5 sentences summarizing candidate's education.
+                           - **Key Requirements Matched:** List bullet points linking candidate's education to JD.
+                           - **Strengths:** Outline possible strengths candidate might have based on theirs education.
+                           - **Gaps/Uncertainties:** Identify missing or unclear aspects of candidate's education.
+                           - **Reasoning Summary:** 2-3 sentences synthesizing the overall alignment of candidate's education to JD.
                         """;
                     break;
 
@@ -272,6 +393,15 @@ namespace ATS.BEST.Services
                         **Anti-Inflation Measures:**  
                         - Demote buzzword-heavy lists without substantiation ("AI/Blockchain")  
                         - Flag potential overstatements: "Photoshop (Expert)" without portfolio  
+                        
+                        **Response Format:**  
+                        - **Candidate Summaries:** For each candidate, provide a separate evaluation section about their skills with the following format:
+                           **{{Candidate Name}}:**  
+                           - **Overall Evaluation:** 2-5 sentences summarizing candidate's skills.
+                           - **Key Requirements Matched:** List bullet points linking candidate's skills to JD.
+                           - **Strengths:** Outline possible strengths candidate might have based on theirs skills.
+                           - **Gaps/Uncertainties:** Identify missing or unclear aspects of candidate's skills.
+                           - **Reasoning Summary:** 2-3 sentences synthesizing the overall alignment of candidate's skills to JD.
                         """;
                     break;
 
@@ -287,13 +417,15 @@ namespace ATS.BEST.Services
                         - Standardized tests: TOEFL (expiry dates), DELE, JLPT levels  
                         - Work Evidence: "Negotiated contracts in Mandarin" > "conversational Chinese"  
 
-                        **Dialectical Requirements:**  
-                        - Regional specificity: Latin American vs European Spanish  
-                        - Technical jargon: Medical German vs conversational fluency  
-
                         **Contextual Bonuses:**  
                         +1 rating if surpassing requirements for client-facing global roles  
                         - Never penalize for additional languages beyond requirements  
+                        
+                        **Response Format:**  
+                        - **Candidate Summaries:** For each candidate, provide a separate evaluation section about their languages with the following format:
+                           **{{Candidate Name}}:**  
+                           - **Overall Evaluation:** 1-3 sentences summarizing candidate's languages.
+                           - **Reasoning Summary:** 2-3 sentences synthesizing the overall alignment of candidate's languages to JD.
                         """;
                     break;
             }
@@ -305,7 +437,7 @@ namespace ATS.BEST.Services
                 {
                     new {
                         role = "system",
-                        content = $"{intro}\n{main}"
+                        content = $"{intro}\n{main}\n{outro}"
                     },
 
                     new {

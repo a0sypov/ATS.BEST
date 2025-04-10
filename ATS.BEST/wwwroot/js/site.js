@@ -82,7 +82,7 @@ function populateTable(data) {
     data.forEach(entry => {
         const name = entry.cv?.name || "Unknown";
         const email = entry.cv?.contacts?.email || "No email";
-        const score = entry.scores?.finalScore/entry.scores?.maxScore * 100 ?? "N/A";
+        const score = entry.scores?.finalScore ?? "N/A";
 
         const row = document.createElement("tr");
 

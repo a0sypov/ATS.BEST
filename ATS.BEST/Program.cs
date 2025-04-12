@@ -21,16 +21,16 @@ namespace ATS.BEST
 
     public class CV
     {
-        public string name { get; set; }
-        public string applied_role { get; set; }
-        public Contacts contacts { get; set; }
-        public List<Language> languages { get; set; }
-        public string summary { get; set; }
-        public List<WorkExperience> work_experience { get; set; }
-        public List<Education> education { get; set; }
-        public List<Skill> skills { get; set; }
-        public List<Project> projects { get; set; }
-        public List<string> hobbies { get; set; }
+        public required string name { get; set; }
+        public required string applied_role { get; set; }
+        public required Contacts contacts { get; set; }
+        public required List<Language> languages { get; set; }
+        public required string summary { get; set; }
+        public required List<WorkExperience> work_experience { get; set; }
+        public required List<Education> education { get; set; }
+        public required List<Skill> skills { get; set; }
+        public required List<Project> projects { get; set; }
+        public required List<string> hobbies { get; set; }
     }
 
 
@@ -41,8 +41,8 @@ namespace ATS.BEST
 
     public class Language : CVSection
     {
-        public string name { get; set; }
-        public string level { get; set; }
+        public required string name { get; set; }
+        public required string level { get; set; }
 
         // ToString()
         public override string ToString()
@@ -53,8 +53,8 @@ namespace ATS.BEST
 
     public class Skill : CVSection
     {
-        public string name { get; set; }
-        public string level { get; set; }
+        public required string name { get; set; }
+        public required string level { get; set; }
 
         // ToString()
         public override string ToString()
@@ -65,7 +65,7 @@ namespace ATS.BEST
 
     public class Technology : CVSection
     { 
-        public string name { get; set; }
+        public required string name { get; set; }
 
         public override string ToString()
         {
@@ -75,9 +75,9 @@ namespace ATS.BEST
 
     public class Project : CVSection
     {
-        public string name { get; set; }
-        public string description { get; set; }
-        public List<Technology> technologies { get; set; }
+        public required string name { get; set; }
+        public required string description { get; set; }
+        public required List<Technology> technologies { get; set; }
 
         // ToString()
         public override string ToString()
@@ -89,10 +89,10 @@ namespace ATS.BEST
 
     public class Contacts : CVSection
     {
-        public string phone { get; set; }
-        public string email { get; set; }
-        public List<string> links { get; set; }
-        public string location { get; set; }
+        public required string phone { get; set; }
+        public required string email { get; set; }
+        public required List<string> links { get; set; }
+        public required string location { get; set; }
 
         // ToString()
         public override string ToString()
@@ -103,10 +103,10 @@ namespace ATS.BEST
 
     public class WorkExperience : CVSection
     {
-        public string role { get; set; }
-        public string company { get; set; }
-        public string dates { get; set; }
-        public List<string> responsibilities { get; set; }
+        public required string role { get; set; }
+        public required string company { get; set; }
+        public required string dates { get; set; }
+        public required List<string> responsibilities { get; set; }
 
         // ToString()
         public override string ToString()
@@ -117,10 +117,10 @@ namespace ATS.BEST
 
     public class Education : CVSection
     {
-        public string title { get; set; }
-        public string institution { get; set; }
-        public string dates { get; set; }
-        public string type { get; set; }
+        public required string title { get; set; }
+        public required string institution { get; set; }
+        public required string dates { get; set; }
+        public required string type { get; set; }
 
         // ToString()
         public override string ToString()

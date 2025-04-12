@@ -178,6 +178,20 @@ namespace ATS.BEST.Controllers
                 }));
         }
 
+        public static float ScaleProportionally(float value, float sum, float minNewRange, float maxNewRange)
+        {
+            // Calculate what percentage of the sum this value represents
+            float percentage = value / sum;
+
+            // Calculate the size of the new range
+            float rangeSize = maxNewRange - minNewRange;
+
+            // Scale the value proportionally within the new range
+            float scaledValue = minNewRange + (percentage * rangeSize);
+
+            return scaledValue;
+        }
+
         [HttpPost]
         [Route("upload")]
         public async Task<IActionResult> ConvertPDFs([FromForm] List<IFormFile> cvs, [FromForm] string jobDescription)
@@ -207,7 +221,7 @@ namespace ATS.BEST.Controllers
             {
                 foreach (var cv in cvs)
                 {
-                    await _hubContext.Clients.All.SendAsync("ReceiveProgress", $"CVs parsing ({cvIndex}/{cvs.Count})...", Math.Clamp(cvIndex, 10, 30));
+                    await _hubContext.Clients.All.SendAsync("ReceiveProgress", $"CVs parsing ({cvIndex}/{cvs.Count})...", Math.Floor(ScaleProportionally(cvIndex, cvs.Count, 10, 35)));
                     cvIndex++;
                     if (cv.Length > 0)
                     {
@@ -244,7 +258,7 @@ namespace ATS.BEST.Controllers
 
             for (int i = 0; i < applicants.Count; i++)
             {
-                await _hubContext.Clients.All.SendAsync("ReceiveProgress", $"Keywords matching ({i+1}/{applicants.Count})...", Math.Clamp(i, 35, 40));
+                await _hubContext.Clients.All.SendAsync("ReceiveProgress", $"Keywords matching ({i+1}/{applicants.Count})...", Math.Floor(ScaleProportionally(i, applicants.Count, 35, 45)));
 
                 int coreWeight = 3;
                 int preferredWeight = 2;

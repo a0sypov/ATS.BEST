@@ -42,6 +42,7 @@ namespace ATS.BEST.Services
                             "PreferredQualifications": [],
                             "NiceToHave": [],
                         }
+                        **DO NOT RETURN ANYTHING ELSE OTHER THAN JSON FORMATTED OUTPUT**
                         """
                     },
 
@@ -248,6 +249,7 @@ namespace ATS.BEST.Services
                 - **Final Rating Format:**  
                   - After the Comparative Analysis, on the final single line, output the final sorted ratings by candidate with the following format, ensuring no additional text is appended:
                     FINAL RATING:
+                    -----
                     {{Candidate Name}} - X
                     {{Candidate Name}} - Y
                     ... 
@@ -514,6 +516,5 @@ namespace ATS.BEST.Services
             }
             return dot / (Math.Sqrt(norm1) * Math.Sqrt(norm2));
         }
-
     }
 }

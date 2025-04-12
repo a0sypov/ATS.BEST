@@ -131,9 +131,9 @@ namespace ATS.BEST
 
     public class ProgressHub : Hub
     {
-        public async Task SendProgress(string message)
+        public async Task SendProgress(string message, int percentage)
         {
-            await Clients.All.SendAsync("ReceiveProgress", message);
+            await Clients.All.SendAsync("ReceiveProgress", message, percentage);
         }
     }
 

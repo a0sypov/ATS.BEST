@@ -121,23 +121,24 @@ const connection = new signalR.HubConnectionBuilder()
     .withUrl("/progressHub")
     .build();
 
-connection.on("ReceiveProgress", function (message) {
-    showLoading(message);
-    if (message === "Done!") {
-        hideLoading();
+connection.on("ReceiveProgress", function (message, percentage) {
+    showLoading(message, percentage);
+    if (message === "Done!" || percentage === 100) {
+        setTimeout(() => hideLoading(), 1000); // Show 100% briefly before hiding
     }
 });
 
 connection.start();
 
-
-
-function showLoading(text = "Loading...") {
-    const container = document.getElementById("loadingContainer");
-    document.getElementById("loadingText").innerText = text;
-    container.style.display = "flex";
+function showLoading(message, percentage) {
+    document.getElementById("loadingContainer").style.display = "flex";
+    document.getElementById("loadingText").innerText = message;
+    document.getElementById("progressBar").style.width = percentage + "%";
+    document.getElementById("progressPercentage").innerText = percentage + "%";
 }
 
 function hideLoading() {
     document.getElementById("loadingContainer").style.display = "none";
 }
+
+

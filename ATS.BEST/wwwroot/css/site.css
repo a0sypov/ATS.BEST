@@ -158,22 +158,30 @@ body {
     height: 100%;
     background-color: rgba(0, 0, 0, 0.5); /* dim background */
     z-index: 9999;
+    padding: 20px;
 }
 
-.spinner {
-    width: 50px;
-    height: 50px;
-    border: 5px solid #f3f3f3;
-    border-top: 5px solid #3498db;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-    margin-bottom: 16px;
+.progress-container {
+    width: 80%;
+    max-width: 500px;
+    height: 20px;
+    background-color: #f3f3f3;
+    border-radius: 10px;
+    margin-bottom: 10px;
+    overflow: hidden;
 }
 
-@keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
+.progress-bar {
+    height: 100%;
+    width: 0%; /* starts at 0% */
+    background-color: #3498db;
+    transition: width 0.3s ease-in-out;
+}
+
+.percentage {
+    color: white;
+    font-size: 1rem;
+    margin-bottom: 8px;
 }
 
 #loadingText {

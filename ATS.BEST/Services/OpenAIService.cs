@@ -14,6 +14,71 @@ namespace ATS.BEST.Services
             _apiKey = config["OpenAI:ApiKey"]; // Store your key in appsettings.json or secrets
         }
 
+        /// <summary>
+        /// Calculates the cosine similarity between two vectors.
+        /// </summary>
+        /// <param name="v1">The first vector.</param>
+        /// <param name="v2">The second vector.</param>
+        /// <returns>The cosine similarity between the two vectors.</returns>
+        public double CosineSimilarity(List<float> v1, List<float> v2)
+        {
+            if (v1.Count != v2.Count) throw new ArgumentException("Vector lengths must match");
+
+            double dot = 0.0, norm1 = 0.0, norm2 = 0.0;
+            for (int i = 0; i < v1.Count; i++)
+            {
+                dot += v1[i] * v2[i];
+                norm1 += Math.Pow(v1[i], 2);
+                norm2 += Math.Pow(v2[i], 2);
+            }
+            return dot / (Math.Sqrt(norm1) * Math.Sqrt(norm2));
+        }
+
+        /// <summary>
+        /// Generates an embedding for the given text using OpenAI's API.
+        /// </summary>
+        /// <param name="inputText">The text to generate an embedding for.</param>
+        /// <returns>A list of floats representing the embedding.</returns>
+        public async Task<List<float>> GetEmbeddingAsync(string inputText)
+        {
+            _httpClient.DefaultRequestHeaders.Clear();
+            _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_apiKey}");
+
+            var requestBody = new
+            {
+                input = inputText,
+                model = "text-embedding-3-small"
+            };
+
+            var content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
+
+            var response = await _httpClient.PostAsync("https://api.openai.com/v1/embeddings", content);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                throw new Exception($"OpenAI API Error (Embeddings): {response.StatusCode}\n{error}");
+            }
+
+            var responseJson = await response.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(responseJson);
+
+            var embeddingArray = doc.RootElement
+                .GetProperty("data")[0]
+                .GetProperty("embedding")
+                .EnumerateArray()
+                .Select(x => x.GetSingle())
+                .ToList();
+
+            return embeddingArray;
+        }
+
+
+
+        /// <summary>
+        /// Generates a list of keywords from a job description.
+        /// </summary>
+        /// <returns>JSON formated string</returns>
         public async Task<string> AI_JobKeywords_Async(string jobDescription)
         {
             _httpClient.DefaultRequestHeaders.Clear();
@@ -31,6 +96,7 @@ namespace ATS.BEST.Services
                         You are an AI assistant designed to from the following job description, extract a concise list of relevant keywords that could be realistically found on a candidate’s CV.  
                         Focus on individual skills, technologies, tools, qualifications, and concepts, rather than full phrases or soft descriptions.  
                         Generalize when appropriate — for example, extract “Docker” instead of “Some experience with Docker”, or “Project Management” instead of “Led multiple projects”.  
+                        
                         Group the keywords by their importance to the role:
                         - **Core Requirements**: absolutely essential to the job  
                         - **Preferred Qualifications**: important, but not mandatory  
@@ -74,6 +140,12 @@ namespace ATS.BEST.Services
         }
 
 
+
+        /// <summary>
+        /// Parses a CV and returns structured data in JSON format.
+        /// </summary>
+        /// <param name="inputText">CV text</param>
+        /// <returns>JSON formated string</returns>
         public async Task<string> AI_CVParsing_Async(string inputText)
         {
             _httpClient.DefaultRequestHeaders.Clear();
@@ -171,6 +243,15 @@ namespace ATS.BEST.Services
                 .GetString();
         }
 
+
+
+        /// <summary>
+        /// Evaluates a CV against a job description and ranks candidates.
+        /// </summary>
+        /// <param name="category">CV section category of evaluation (work_experience, projects, education, skills, languages)</param>
+        /// <param name="cvSections">CV sections to evaluate</param>
+        /// <param name="jobDescription">Job description to compare against</param>
+        /// <returns>Evaluation result as a string</returns>
         public async Task<string> AI_CVEvaluation_Async(string category, string cvSections, string jobDescription)
         {
             _httpClient.DefaultRequestHeaders.Clear();
@@ -239,14 +320,16 @@ namespace ATS.BEST.Services
                 
                 - **Comparative Analysis Section:**  
                   - After individual evaluations, include a comparative analysis section that highlights key differentiators between candidates and any trade-offs.
-                  - Separate this section from the candidate evaluations using: `-----`
+                
+                **Additional Consistency Instructions:**  
+                  - **Normalization Step:** After draft scoring, perform a normalization where each candidate’s final score is adjusted in relation to the group’s average if needed to minimize variability.
+                  - **Direct Explanations:** Provide clear explanations for any adjustments made between the initial draft score and the final score.
+                  - **Examples:** If necessary, briefly illustrate how a minor gap in a requirement might lead to a small deduction to maintain scoring consistency.
                 
                 - **Final Ratings**
                   - Calculate using formula:
                     ((KeyReq×4) + (Depth×3) + (Preferred×2) - Gaps) + Bonuses
                     Convert to 1-10 scale via: (Total/10)×10
-                
-                - **Final Rating Format:**  
                   - After the Comparative Analysis, on the final single line, output the final sorted ratings by candidate with the following format, ensuring no additional text is appended:
                     FINAL RATING:
                     -----
@@ -254,11 +337,12 @@ namespace ATS.BEST.Services
                     {{Candidate Name}} - Y
                     ... 
                     {{Candidate Name}} - Z
-                
-                **Additional Consistency Instructions:**  
-                - **Normalization Step:** After draft scoring, perform a normalization where each candidate’s final score is adjusted in relation to the group’s average if needed to minimize variability.
-                - **Direct Explanations:** Provide clear explanations for any adjustments made between the initial draft score and the final score.
-                - **Examples:** If necessary, briefly illustrate how a minor gap in a requirement might lead to a small deduction to maintain scoring consistency.
+                  - Example:
+                    FINAL RATING:
+                    -----
+                    John Doe - 8
+                    Jane Smith - 7
+                    Bob Johnson - 6
                 
                 **Ensure that all candidate evaluations and the final output strictly adhere to the structure above.**
                 """;
@@ -467,54 +551,6 @@ namespace ATS.BEST.Services
                 .GetProperty("message")
                 .GetProperty("content")
                 .GetString();
-        }
-
-        public async Task<List<float>> GetEmbeddingAsync(string inputText)
-        {
-            _httpClient.DefaultRequestHeaders.Clear();
-            _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_apiKey}");
-
-            var requestBody = new
-            {
-                input = inputText,
-                model = "text-embedding-3-small"
-            };
-
-            var content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
-
-            var response = await _httpClient.PostAsync("https://api.openai.com/v1/embeddings", content);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                var error = await response.Content.ReadAsStringAsync();
-                throw new Exception($"OpenAI API Error (Embeddings): {response.StatusCode}\n{error}");
-            }
-
-            var responseJson = await response.Content.ReadAsStringAsync();
-            using var doc = JsonDocument.Parse(responseJson);
-
-            var embeddingArray = doc.RootElement
-                .GetProperty("data")[0]
-                .GetProperty("embedding")
-                .EnumerateArray()
-                .Select(x => x.GetSingle())
-                .ToList();
-
-            return embeddingArray;
-        }
-
-        public double CosineSimilarity(List<float> v1, List<float> v2)
-        {
-            if (v1.Count != v2.Count) throw new ArgumentException("Vector lengths must match");
-
-            double dot = 0.0, norm1 = 0.0, norm2 = 0.0;
-            for (int i = 0; i < v1.Count; i++)
-            {
-                dot += v1[i] * v2[i];
-                norm1 += Math.Pow(v1[i], 2);
-                norm2 += Math.Pow(v2[i], 2);
-            }
-            return dot / (Math.Sqrt(norm1) * Math.Sqrt(norm2));
         }
     }
 }

@@ -14,6 +14,131 @@ using System.Globalization;
 
 namespace ATS.BEST.Controllers
 {
+    public class KeywordGroups
+    {
+        public List<string> CoreRequirements { get; set; }
+        public List<string> PreferredQualifications { get; set; }
+        public List<string> NiceToHave { get; set; }
+
+        // ToString()
+        public override string ToString()
+        {
+            return $"Core Requirements: {string.Join(", ", CoreRequirements)}\n" +
+                   $"Preferred Qualifications: {string.Join(", ", PreferredQualifications)}\n" +
+                   $"Nice to Have: {string.Join(", ", NiceToHave)}";
+        }
+
+        public bool IsEmpty()
+        {
+            return !CoreRequirements.Any() && !PreferredQualifications.Any() && !NiceToHave.Any();
+        }
+    }
+
+
+    public class CV
+    {
+        public required string name { get; set; }
+        public required string applied_role { get; set; }
+        public required Contacts contacts { get; set; }
+        public required List<Language> languages { get; set; }
+        public required string summary { get; set; }
+        public required List<WorkExperience> work_experience { get; set; }
+        public required List<Education> education { get; set; }
+        public required List<Skill> skills { get; set; }
+        public required List<Project> projects { get; set; }
+        public required List<string> hobbies { get; set; }
+    }
+
+    public abstract class CVSection
+    {
+        public abstract override string ToString();
+    }
+
+    public class Language : CVSection
+    {
+        public required string name { get; set; }
+        public required string level { get; set; }
+
+        // ToString()
+        public override string ToString()
+        {
+            return $"{name} - {level}";
+        }
+    }
+    public class Skill : CVSection
+    {
+        public required string name { get; set; }
+        public required string level { get; set; }
+
+        // ToString()
+        public override string ToString()
+        {
+            return $"{name} - {level}";
+        }
+    }
+    public class Technology : CVSection
+    {
+        public required string name { get; set; }
+
+        public override string ToString()
+        {
+            return name;
+        }
+    }
+    public class Project : CVSection
+    {
+        public required string name { get; set; }
+        public required string description { get; set; }
+        public required List<Technology> technologies { get; set; }
+
+        // ToString()
+        public override string ToString()
+        {
+            string allTechnologies = string.Join(", ", technologies.Select(t => t.name));
+            return $"Title: {name}:\nUsed technologies: {allTechnologies}\nDescription: {description}\n";
+        }
+    }
+    public class Contacts : CVSection
+    {
+        public required string phone { get; set; }
+        public required string email { get; set; }
+        public required List<string> links { get; set; }
+        public required string location { get; set; }
+
+        // ToString()
+        public override string ToString()
+        {
+            return $"Phone: {phone}\nEmail: {email}\nLocation: {location}\nLinks: {string.Join(", ", links)}\n";
+        }
+    }
+    public class WorkExperience : CVSection
+    {
+        public required string role { get; set; }
+        public required string company { get; set; }
+        public required string dates { get; set; }
+        public required List<string> responsibilities { get; set; }
+
+        // ToString()
+        public override string ToString()
+        {
+            return $"Role: {role}:\nCompany: {company}\nDates: {dates}\nResponsibilities: {string.Join("; ", responsibilities)}\n";
+        }
+    }
+    public class Education : CVSection
+    {
+        public required string title { get; set; }
+        public required string institution { get; set; }
+        public required string dates { get; set; }
+        public required string type { get; set; }
+
+        // ToString()
+        public override string ToString()
+        {
+            return $"Title: {title}:\nType: {type}\nInstitution: {institution}\nDates: {dates}\n";
+        }
+    }
+
+
     public struct ApplicantScore
     {
         public float keywordsScore { get; set; }
@@ -40,6 +165,19 @@ namespace ATS.BEST.Controllers
             languagesScore = _languagesScore;
         }
     }
+    
+    public struct ApplicantEvaluation
+    {
+        public float score { get; set; }
+        public string aiEvaluation { get; set; }
+
+        public ApplicantEvaluation(float _score, string _aiEvaluation) : this()
+        {
+            this.score = _score;
+            this.aiEvaluation = _aiEvaluation;
+        }
+    }
+
     public struct Applicant
     {
         public string CVFullString { get; set; }
@@ -63,17 +201,7 @@ namespace ATS.BEST.Controllers
             AIEvaluation = _AIEvaluation;
         }
     }
-    public struct ApplicantEvaluation
-    {
-        public float score { get; set; }
-        public string aiEvaluation { get; set; }
 
-        public ApplicantEvaluation(float _score, string _aiEvaluation) : this()
-        {
-            this.score = _score;
-            this.aiEvaluation = _aiEvaluation;
-        }
-    }
 
     [ApiController]
     [Route("api/[controller]")]
@@ -89,7 +217,7 @@ namespace ATS.BEST.Controllers
         }
 
         // Helper method for retry logic
-        private async Task<T> RetryOnException<T>(Func<Task<T>> operation, string progressMessage, int progressPercentage, string errorLogMessage, int maxRetries = 3)
+        private async Task<T> RetryOnException<T>(Func<Task<T>> operation, string progressMessage, int progressPercentage, string errorLogMessage, string connectionId, int maxRetries = 3)
         {
             int attempts = 0;
             while (true)
@@ -99,11 +227,11 @@ namespace ATS.BEST.Controllers
                     attempts++;
                     if (attempts > 1)
                     {
-                        await _hubContext.Clients.All.SendAsync("ReceiveProgress", $"Retry attempt {attempts}: {progressMessage}", progressPercentage);
+                        await _hubContext.Clients.Client(connectionId).SendAsync("ReceiveProgress", $"Retry attempt {attempts}: {progressMessage}", progressPercentage);
                     }
                     else
                     {
-                        await _hubContext.Clients.All.SendAsync("ReceiveProgress", progressMessage, progressPercentage);
+                        await _hubContext.Clients.Client(connectionId).SendAsync("ReceiveProgress", progressMessage, progressPercentage);
                     }
 
                     return await operation();
@@ -115,18 +243,23 @@ namespace ATS.BEST.Controllers
                     // If reached max retries, notify failure
                     if (attempts >= maxRetries)
                     {
-                        await _hubContext.Clients.All.SendAsync("ReceiveProgress", "Maximum retry attempts reached. Operation failed.", progressPercentage);
+                        await _hubContext.Clients.Client(connectionId).SendAsync("ReceiveProgress", "Maximum retry attempts reached. Operation failed.", progressPercentage);
                         throw;
                     }
 
                     // Wait a bit before retrying (optional)
                     await Task.Delay(100);
 
-                    await _hubContext.Clients.All.SendAsync("ReceiveProgress", "Error during processing! Retrying...", progressPercentage);
+                    await _hubContext.Clients.Client(connectionId).SendAsync("ReceiveProgress", "Error during processing! Retrying...", progressPercentage);
                 }
             }
         }
 
+        /// <summary>
+        /// Parses the sections of the CV evaluation response into a dictionary.
+        /// </summary>
+        /// <param name="sections">The sections of the CV evaluation response.</param>
+        /// <returns>A dictionary where the key is the section name and the value is the evaluation.</returns>
         private Dictionary<string, string> ParseSectionsToDictionary(string[] sections)
         {
             Dictionary<string, string> sectionsDict = new Dictionary<string, string>();
@@ -142,6 +275,12 @@ namespace ATS.BEST.Controllers
             return sectionsDict;
         }
 
+        /// <summary>
+        /// Parses the candidates' rating from the last section of the CV evaluation response.
+        /// </summary>
+        /// <param name="sections">The sections of the CV evaluation response.</param>
+        /// <param name="applicantsCount">The number of applicants.</param>
+        /// <returns>A dictionary where the key is the candidate's name and the value is their evaluation (score and evaluation).</returns>
         private Dictionary<string, ApplicantEvaluation> ParseCandidatesEvaluation(string[] sections, int applicantsCount)
         {
             Dictionary<string, ApplicantEvaluation> ratings = new Dictionary<string, ApplicantEvaluation>();
@@ -164,6 +303,14 @@ namespace ATS.BEST.Controllers
             return ratings;
         }
 
+        /// <summary>
+        /// Composes a section of the CV for each applicant.
+        /// </summary>
+        /// <typeparam name="T">The type of the section items (e.g., WorkExperience, Education).</typeparam>
+        /// <param name="applicants">The list of applicants.</param>
+        /// <param name="sectionSelector">A function to select the section items from the CV.</param>
+        /// <param name="emptySectionMessage">The message to display if the section is empty.</param>
+        /// <returns>A string containing the composed sections for all applicants.</returns>
         private string ComposeApplicantsSection<T>(List<Applicant> applicants, Func<CV, IEnumerable<T>> sectionSelector, string emptySectionMessage)
         {
             return string.Join(
@@ -178,6 +325,14 @@ namespace ATS.BEST.Controllers
                 }));
         }
 
+        /// <summary>
+        /// Scales a value proportionally within a new range based on its percentage of the sum.
+        /// </summary>
+        /// <param name="value">The value to scale.</param>
+        /// <param name="sum">The sum of all values.</param>
+        /// <param name="minNewRange">The minimum of the new range.</param>
+        /// <param name="maxNewRange">The maximum of the new range.</param>
+        /// <returns>The scaled value within the new range.</returns>
         public static float ScaleProportionally(float value, float sum, float minNewRange, float maxNewRange)
         {
             // Calculate what percentage of the sum this value represents
@@ -192,73 +347,87 @@ namespace ATS.BEST.Controllers
             return scaledValue;
         }
 
-        [HttpPost]
-        [Route("upload")]
-        public async Task<IActionResult> ConvertPDFs([FromForm] List<IFormFile> cvs, [FromForm] string jobDescription)
+        public async Task<KeywordGroups> ParseKeywords(string _jobDescription)
         {
-            if (cvs == null || cvs.Count == 0)
-                return BadRequest("No files uploaded.");
+            string jobKeywords_JSON_AI = await _openAi.AI_JobKeywords_Async(_jobDescription);
+            string jobKeywords_JSON_Cleaned = Regex.Unescape(jobKeywords_JSON_AI);
 
-            await _hubContext.Clients.All.SendAsync("ReceiveProgress", "Starting...", 0);
+            return JsonSerializer.Deserialize<KeywordGroups>(jobKeywords_JSON_Cleaned) ?? new KeywordGroups();
+        }
 
+        public async Task<List<Applicant>> InitialCulling(List<IFormFile> cvs, string jobDescription, string connectionId)
+        {
+            List<float> jobDescriptionEmbedding = await _openAi.GetEmbeddingAsync(jobDescription);
+            
             List<Applicant> applicants = new List<Applicant>();
 
-            string JSONJobKeywords = await _openAi.AI_JobKeywords_Async(jobDescription);
-            string cleanedJSONJobKeywords = System.Text.RegularExpressions.Regex.Unescape(JSONJobKeywords);
-            KeywordGroups? keywordGroups = JsonSerializer.Deserialize<KeywordGroups>(cleanedJSONJobKeywords);
-            if (keywordGroups == null)
-            {
-                return BadRequest("Failed to parse job keywords.");
-            }
-            Console.WriteLine(keywordGroups.ToString());
-
-            await _hubContext.Clients.All.SendAsync("ReceiveProgress", "Prelimenary culling...", 5);
-            List<float> jbEmbedding = await _openAi.GetEmbeddingAsync(jobDescription);
-
             int cvIndex = 1;
-
-            try
+            foreach (var cv in cvs)
             {
-                foreach (var cv in cvs)
+                await _hubContext.Clients.Client(connectionId).SendAsync(
+                    "ReceiveProgress",
+                    $"CVs parsing ({cvIndex}/{cvs.Count})...",
+                    Math.Floor(ScaleProportionally(cvIndex, cvs.Count, 10, 35)));
+
+                cvIndex++;
+                if (cv.Length > 0)
                 {
-                    await _hubContext.Clients.All.SendAsync("ReceiveProgress", $"CVs parsing ({cvIndex}/{cvs.Count})...", Math.Floor(ScaleProportionally(cvIndex, cvs.Count, 10, 35)));
-                    cvIndex++;
-                    if (cv.Length > 0)
+                    using var stream = cv.OpenReadStream();
+                    using var pdf = PdfDocument.Open(stream);
+
+                    var fullText = string.Join("\n", pdf.GetPages().Select(p => p.Text));
+
+                    List<float> cvEmbedding = await _openAi.GetEmbeddingAsync(fullText);
+
+                    float cosineSimilarity = (float)_openAi.CosineSimilarity(jobDescriptionEmbedding, cvEmbedding);
+
+                    if (cosineSimilarity >= 0.5)
                     {
-                        using var stream = cv.OpenReadStream();
-                        using var pdf = PdfDocument.Open(stream);
+                        string JSONCV = await _openAi.AI_CVParsing_Async(fullText);
+                        string cleanedJSONCV = Regex.Unescape(JSONCV);
 
-                        var fullText = string.Join("\n", pdf.GetPages().Select(p => p.Text));
+                        CV? CV = JsonSerializer.Deserialize<CV>(cleanedJSONCV);
 
-                        List<float> cvEmbedding = await _openAi.GetEmbeddingAsync(fullText);
-
-                        float cosineSimilarity = (float)_openAi.CosineSimilarity(jbEmbedding, cvEmbedding);
-
-                        if (cosineSimilarity >= 0.5)
+                        if (CV == null)
                         {
-                            string JSONCV = await _openAi.AI_CVParsing_Async(fullText);
-                            string cleanedJSONCV = System.Text.RegularExpressions.Regex.Unescape(JSONCV);
-
-                            CV CV = JsonSerializer.Deserialize<CV>(cleanedJSONCV);
-                            ApplicantScore newEmbeddingScore = new ApplicantScore();
-                            newEmbeddingScore.embeddingScore = cosineSimilarity;
-
-                            // applicants.Add(new Applicant(CV, fullText));
-                            applicants.Add(new Applicant(CV, fullText, newEmbeddingScore, ""));
+                            Console.WriteLine("Error parsing CV");
+                            continue;
                         }
+
+                        ApplicantScore newEmbeddingScore = new ApplicantScore();
+                        newEmbeddingScore.embeddingScore = cosineSimilarity;
+
+                        // applicants.Add(new Applicant(CV, fullText));
+                        applicants.Add(new Applicant(CV, fullText, newEmbeddingScore, ""));
                     }
                 }
             }
-            catch (Exception)
+
+            return applicants;
+        }
+
+        // Helper to safely create a word-boundary regex
+        bool MatchesKeyword(string text, string keyword)
+        {
+            string escaped = Regex.Escape(keyword.ToLower());
+            string pattern = $@"\b{escaped}\b";
+            return Regex.IsMatch(text, pattern, RegexOptions.IgnoreCase);
+        }
+
+        public async void KeyWordsMatching(string jobDescription, List<Applicant> applicants, string connectionId)
+        {
+            KeywordGroups keywordGroups = await ParseKeywords(jobDescription);
+            if (keywordGroups.IsEmpty())
             {
-                Console.WriteLine("Parsing error");
-                throw;
+                return;
             }
-            
 
             for (int i = 0; i < applicants.Count; i++)
             {
-                await _hubContext.Clients.All.SendAsync("ReceiveProgress", $"Keywords matching ({i+1}/{applicants.Count})...", Math.Floor(ScaleProportionally(i, applicants.Count, 35, 45)));
+                await _hubContext.Clients.Client(connectionId).SendAsync(
+                    "ReceiveProgress",
+                    $"Keywords matching ({i + 1}/{applicants.Count})...",
+                    Math.Floor(ScaleProportionally(i, applicants.Count, 35, 45)));
 
                 int coreWeight = 3;
                 int preferredWeight = 2;
@@ -273,14 +442,6 @@ namespace ATS.BEST.Controllers
                 // Normalize CV text
                 string normalizedCv = applicants[i].CVFullString.ToLower();
 
-                // Helper to safely create a word-boundary regex
-                bool MatchesKeyword(string text, string keyword)
-                {
-                    string escaped = Regex.Escape(keyword.ToLower());
-                    string pattern = $@"\b{escaped}\b";
-                    return Regex.IsMatch(text, pattern, RegexOptions.IgnoreCase);
-                }
-
                 // Scoring
                 actualScore += keywordGroups.CoreRequirements.Count(k => MatchesKeyword(normalizedCv, k)) * coreWeight;
                 actualScore += keywordGroups.PreferredQualifications.Count(k => MatchesKeyword(normalizedCv, k)) * preferredWeight;
@@ -294,83 +455,129 @@ namespace ATS.BEST.Controllers
 
                 applicants[i] = new Applicant(applicants[i].CV, applicants[i].CVFullString, newKeywordScore, applicants[i].AIEvaluation);
             }
+        }
 
-            await _hubContext.Clients.All.SendAsync("ReceiveProgress", $"Analyzing sections...", 45);
+
+        [HttpPost]
+        [Route("upload")]
+        public async Task<IActionResult> ProcessCVs([FromForm] List<IFormFile> cvs, [FromForm] string jobDescription, [FromForm] string connectionId)
+        {
+            if (cvs == null || cvs.Count == 0)
+                return BadRequest("No files uploaded.");
+
+            await _hubContext.Clients.Client(connectionId).SendAsync(
+                "ReceiveProgress", 
+                "Starting...", 
+                0);
+
+            // Initial culling of candidates using embedding + CV parsing
+            List<Applicant> applicants = await InitialCulling(cvs, jobDescription, connectionId);
+
+            // First evaluation of candidates based on keywords matching
+            KeyWordsMatching(jobDescription, applicants, connectionId);
+
+            await _hubContext.Clients.Client(connectionId).SendAsync(
+                "ReceiveProgress", 
+                $"Analyzing sections...", 
+                45);
+
+            // Section divided info about all applicants (info about all candidates workExperience, education...)
             string workExperiences = ComposeApplicantsSection(applicants, cv => cv.work_experience, "**[NO WORK EXPERIENCE SPECIFIED]**");
             string educations = ComposeApplicantsSection(applicants, cv => cv.education, "**[NO EDUCATION SPECIFIED]**");
             string projects = ComposeApplicantsSection(applicants, cv => cv.projects, "**[NO PROJECTS SPECIFIED]**");
             string skills = ComposeApplicantsSection(applicants, cv => cv.skills, "**[NO SKILLS SPECIFIED]**");
             string languages = ComposeApplicantsSection(applicants, cv => cv.languages, "**[NO LANGUAGES SPECIFIED]**");
-            
+
+
+            string workExperienceEval;
+            string[] workExperienceSections;
             Dictionary<string, ApplicantEvaluation> workExperienceEvaluation = await RetryOnException<Dictionary<string, ApplicantEvaluation>>(
                 async () => {
-                    string workExperienceEval = await _openAi.AI_CVEvaluation_Async("work_experience", workExperiences, jobDescription);
-                    string[] workExperienceSections = workExperienceEval.Split(["-----"], StringSplitOptions.TrimEntries);
+                    workExperienceEval = await _openAi.AI_CVEvaluation_Async("work_experience", workExperiences, jobDescription);
+                    workExperienceSections = workExperienceEval.Split(["-----"], StringSplitOptions.TrimEntries);
                     Console.WriteLine("WORK");
                     return ParseCandidatesEvaluation(workExperienceSections, applicants.Count);
                 },
                 "Work experience evaluation...", 50,
-                "Error parsing AI evaluations for work experience"
+                "Error parsing AI evaluations for work experience",
+                connectionId
             );
 
+            string projectsEval;
+            string[] projectsSections;
             Dictionary<string, ApplicantEvaluation> projectsEvaluation = await RetryOnException<Dictionary<string, ApplicantEvaluation>>(
                 async () => {
-                    string projectsEval = await _openAi.AI_CVEvaluation_Async("projects", projects, jobDescription);
-                    string[] projectsSections = projectsEval.Split(["-----"], StringSplitOptions.TrimEntries);
+                    projectsEval = await _openAi.AI_CVEvaluation_Async("projects", projects, jobDescription);
+                    projectsSections = projectsEval.Split(["-----"], StringSplitOptions.TrimEntries);
                     Console.WriteLine("PROJECTS");
                     return ParseCandidatesEvaluation(projectsSections, applicants.Count);
                 },
                 "Projects evaluation...", 60,
-                "Error parsing AI evaluations for projects"
+                "Error parsing AI evaluations for projects",
+                connectionId
             );
 
+            string educationEval;
+            string[] educationSections;
             Dictionary<string, ApplicantEvaluation> educationEvaluation = await RetryOnException<Dictionary<string, ApplicantEvaluation>>(
                 async () => {
-                    string educationEval = await _openAi.AI_CVEvaluation_Async("education", educations, jobDescription);
-                    string[] educationSections = educationEval.Split(["-----"], StringSplitOptions.TrimEntries);
+                    educationEval = await _openAi.AI_CVEvaluation_Async("education", educations, jobDescription);
+                    educationSections = educationEval.Split(["-----"], StringSplitOptions.TrimEntries);
                     Console.WriteLine("EDUCATION");
                     return ParseCandidatesEvaluation(educationSections, applicants.Count);
                 },
                 "Education evaluation...", 70,
-                "Error parsing AI evaluations for education"
+                "Error parsing AI evaluations for education",
+                connectionId
             );
 
+            string skillsEval;
+            string[] skillsSections;
             Dictionary<string, ApplicantEvaluation> skillsEvaluation = await RetryOnException<Dictionary<string, ApplicantEvaluation>>(
                 async () => {
-                    string skillsEval = await _openAi.AI_CVEvaluation_Async("skills", skills, jobDescription);
-                    string[] skillsSections = skillsEval.Split(["-----"], StringSplitOptions.TrimEntries);
+                    skillsEval = await _openAi.AI_CVEvaluation_Async("skills", skills, jobDescription);
+                    skillsSections = skillsEval.Split(["-----"], StringSplitOptions.TrimEntries);
                     Console.WriteLine("SKILLS");
                     return ParseCandidatesEvaluation(skillsSections, applicants.Count);
                 },
                 "Skills evaluation...", 80,
-                "Error parsing AI evaluations for skills"
+                "Error parsing AI evaluations for skills",
+                connectionId
             );
 
+            string languagesEval;
+            string[] languagesSections;
             Dictionary<string, ApplicantEvaluation> languagesEvaluation = await RetryOnException<Dictionary<string, ApplicantEvaluation>>(
                 async () => {
-                    string languagesEval = await _openAi.AI_CVEvaluation_Async("languages", languages, jobDescription);
-                    string[] languagesSections = languagesEval.Split(["-----"], StringSplitOptions.TrimEntries);
+                    languagesEval = await _openAi.AI_CVEvaluation_Async("languages", languages, jobDescription);
+                    languagesSections = languagesEval.Split(["-----"], StringSplitOptions.TrimEntries);
                     Console.WriteLine("LANGUAGES");
                     return ParseCandidatesEvaluation(languagesSections, applicants.Count);
                 },
                 "Languages evaluation...", 90,
-                "Error parsing AI evaluations for languages"
+                "Error parsing AI evaluations for languages",
+                connectionId
             );
 
-            await _hubContext.Clients.All.SendAsync("ReceiveProgress", $"Finalizing results...", 95);
-            for (int i = 0; i < applicants.Count; i++)
+            await _hubContext.Clients.Client(connectionId).SendAsync(
+                "ReceiveProgress", 
+                $"Finalizing results...", 
+                95);
+            try
             {
-                CV cv = applicants[i].CV;
-                ApplicantScore newScores = new ApplicantScore();
-                string applicantsName = cv.name.ToLower().Replace(" ", "");
+                for (int i = 0; i < applicants.Count; i++)
+                {
+                    CV cv = applicants[i].CV;
+                    ApplicantScore newScores = new ApplicantScore();
+                    string applicantsName = cv.name.ToLower().Replace(" ", "");
 
-                newScores.workExperienceScore = workExperienceEvaluation[applicantsName].score;
-                newScores.projectsScore = projectsEvaluation[applicantsName].score;
-                newScores.educationScore = educationEvaluation[applicantsName].score;
-                newScores.skillsScore = skillsEvaluation[applicantsName].score;
-                newScores.languagesScore = languagesEvaluation[applicantsName].score;
+                    newScores.workExperienceScore = workExperienceEvaluation[applicantsName].score;
+                    newScores.projectsScore = projectsEvaluation[applicantsName].score;
+                    newScores.educationScore = educationEvaluation[applicantsName].score;
+                    newScores.skillsScore = skillsEvaluation[applicantsName].score;
+                    newScores.languagesScore = languagesEvaluation[applicantsName].score;
 
-                Dictionary<string, float> sectionWeights = new Dictionary<string, float>
+                    Dictionary<string, float> sectionWeights = new Dictionary<string, float>
                     {
                         { "work_experience", 1.0f },
                         { "projects", 0.7f },
@@ -379,32 +586,42 @@ namespace ATS.BEST.Controllers
                         { "languages", 0.1f }
                     };
 
-                float finalScore = newScores.workExperienceScore * sectionWeights["work_experience"] +
-                                   newScores.projectsScore * sectionWeights["projects"] +
-                                   newScores.educationScore * sectionWeights["education"] +
-                                   newScores.skillsScore * sectionWeights["skills"] +
-                                   newScores.languagesScore * sectionWeights["languages"];
-                newScores.finalScore = finalScore;
+                    float finalScore = newScores.workExperienceScore * sectionWeights["work_experience"] +
+                                       newScores.projectsScore * sectionWeights["projects"] +
+                                       newScores.educationScore * sectionWeights["education"] +
+                                       newScores.skillsScore * sectionWeights["skills"] +
+                                       newScores.languagesScore * sectionWeights["languages"];
+                    newScores.finalScore = finalScore;
 
-                float maxScore = 10 * sectionWeights["work_experience"] +
-                                   10 * sectionWeights["projects"] +
-                                   10 * sectionWeights["education"] +
-                                   10 * sectionWeights["skills"] +
-                                   10 * sectionWeights["languages"];
+                    float maxScore = 10 * sectionWeights["work_experience"] +
+                                       10 * sectionWeights["projects"] +
+                                       10 * sectionWeights["education"] +
+                                       10 * sectionWeights["skills"] +
+                                       10 * sectionWeights["languages"];
 
-                float finalFinalScore = (applicants[i].Scores.embeddingScore * 100) * 0.4f +
-                    applicants[i].Scores.keywordsScore * 0.2f + 
-                    (finalScore / maxScore * 100) * 0.4f;
-                newScores.maxScore = maxScore;
+                    float finalFinalScore = (applicants[i].Scores.embeddingScore * 100) * 0.4f +
+                        applicants[i].Scores.keywordsScore * 0.2f +
+                        (finalScore / maxScore * 100) * 0.4f;
+                    newScores.maxScore = maxScore;
 
-                newScores.finalScore = finalFinalScore;
-                newScores.keywordsScore = applicants[i].Scores.keywordsScore;
-                newScores.embeddingScore = applicants[i].Scores.embeddingScore;
+                    newScores.finalScore = finalFinalScore;
+                    newScores.keywordsScore = applicants[i].Scores.keywordsScore;
+                    newScores.embeddingScore = applicants[i].Scores.embeddingScore;
 
-                string AIEvaluation = $"Work experience:\n{workExperienceEvaluation[applicantsName].aiEvaluation}\n\nProjects:\n{projectsEvaluation[applicantsName].aiEvaluation}\n\nEducation:\n{educationEvaluation[applicantsName].aiEvaluation}\n\nSkills:\n{skillsEvaluation[applicantsName].aiEvaluation}\n\nLanguages:\n{languagesEvaluation[applicantsName].aiEvaluation}";
-                applicants[i] = new Applicant(cv, applicants[i].CVFullString, newScores, AIEvaluation);
+                    string AIEvaluation = $"Work experience:\n{workExperienceEvaluation[applicantsName].aiEvaluation}\n\nProjects:\n{projectsEvaluation[applicantsName].aiEvaluation}\n\nEducation:\n{educationEvaluation[applicantsName].aiEvaluation}\n\nSkills:\n{skillsEvaluation[applicantsName].aiEvaluation}\n\nLanguages:\n{languagesEvaluation[applicantsName].aiEvaluation}";
+                    applicants[i] = new Applicant(cv, applicants[i].CVFullString, newScores, AIEvaluation);
+                }
             }
-            await _hubContext.Clients.All.SendAsync("ReceiveProgress", "Done!", 100);
+            catch (Exception)
+            {
+                Console.WriteLine("Error finalizing results");
+                throw;
+            }
+            
+            await _hubContext.Clients.Client(connectionId).SendAsync(
+                "ReceiveProgress", 
+                "Done!", 
+                100);
 
             await Task.CompletedTask;
             return Ok( applicants );

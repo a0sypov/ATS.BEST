@@ -37,16 +37,20 @@ dropZone.addEventListener("drop", (e) => {
 });
 
 function handleFiles(files) {
+    // Show immediate feedback that upload is starting
+    showLoading("Starting file upload...", 1);
+
     const pdfFiles = [...files].filter(file => file.type === "application/pdf");
     if (pdfFiles.length === 0) {
         alert("Please upload only PDF files.");
+        hideLoading();
         return;
     }
 
     const formData = new FormData();
     pdfFiles.forEach((file, index) => {
-        // Use 'files' as the key and allow multiple files
         formData.append("cvs", file);
+        console.log(`Adding file: ${file.name}, size: ${file.size}`);
     });
 
     const jobDesc = jobDescription.value;
@@ -55,24 +59,34 @@ function handleFiles(files) {
     }
     else {
         alert("Please enter a job description.");
+        hideLoading();
         return;
     }
 
+    // Add connection ID for our fixed signalR issue
+    formData.append("connectionId", connection.connectionId);
+
+    console.log("Starting fetch request...");
     fetch(`${window.location.origin}/api/routing/upload`, {
         method: "POST",
         body: formData,
     })
-        .then(response => response.json())
+        .then(response => {
+            console.log("Response status:", response.status);
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+            return response.json();
+        })
         .then(data => {
             console.log("Parsed server response:", data);
-            const sortedData = data.sort((a, b) => {
-                const aScore = parseFloat(a.scores?.finalScore ?? -Infinity);
-                const bScore = parseFloat(b.scores?.finalScore ?? -Infinity);
-                return bScore - aScore; // Descending
-            });
             populateTable(data);
         })
-        .catch(err => console.error("Upload error:", err));
+        .catch(err => {
+            console.error("Upload error:", err);
+            alert("Error uploading files: " + err.message);
+            hideLoading();
+        });
 }
 
 function populateTable(data) {

@@ -286,20 +286,45 @@ namespace ATS.BEST.Controllers
             Dictionary<string, ApplicantEvaluation> ratings = new Dictionary<string, ApplicantEvaluation>();
             string[] ratingsList = sections.Last().Split('\n', StringSplitOptions.TrimEntries);
 
+            // Print ratingsList
+            Console.WriteLine("Ratings List:");
+            foreach (string rating in ratingsList)
+            {
+                Console.WriteLine(rating);
+            }
+            Console.WriteLine("End of Ratings List\n\n");
+
             Dictionary<string, string> sectionsDict = ParseSectionsToDictionary(sections);
+
+            // Print sectionsDict
+            Console.WriteLine("Sections Dictionary:");
+            foreach (var kvp in sectionsDict)
+            {
+                Console.WriteLine($"{kvp.Key}::");
+            }
+            Console.WriteLine("End of Sections Dictionary\n\n");
+
             for (int i = ratingsList.Length - 1; i > ratingsList.Length - 1 - applicantsCount; i--)
             {
                 string[] nameAndRating = ratingsList[i].Split('-');
                 if (nameAndRating.Length != 2)
                     continue;
 
-                string name = nameAndRating[0].Trim().ToLower().Replace(" ", "");
+                string name = nameAndRating[0].Trim().ToLower().Replace(" ", "").Replace("*", "");
                 float rating = 0;
                 if (float.TryParse(nameAndRating[1].Trim(), out rating))
                 {
                     ratings.Add(name, new ApplicantEvaluation(rating, sectionsDict[name]));
                 }
             }
+
+            // print ratings
+            Console.WriteLine("Ratings Dictionary:");
+            foreach (var kvp in ratings)
+            {
+                Console.WriteLine($"{kvp.Key}::");
+            }
+            Console.WriteLine("End of Ratings Dictionary\n\n");
             return ratings;
         }
 
@@ -473,6 +498,9 @@ namespace ATS.BEST.Controllers
             // Initial culling of candidates using embedding + CV parsing
             List<Applicant> applicants = await InitialCulling(cvs, jobDescription, connectionId);
 
+            // A string that contains applicants name in a numberred list
+            string applicantsNames = "\nCURRENT CADNIDATES LIST:\n" + string.Join("\n", applicants.Select((a, i) => $"{i + 1}. {a.CV.name}"));
+
             // First evaluation of candidates based on keywords matching
             KeyWordsMatching(jobDescription, applicants, connectionId);
 
@@ -482,11 +510,23 @@ namespace ATS.BEST.Controllers
                 45);
 
             // Section divided info about all applicants (info about all candidates workExperience, education...)
-            string workExperiences = ComposeApplicantsSection(applicants, cv => cv.work_experience, "**[NO WORK EXPERIENCE SPECIFIED]**");
-            string educations = ComposeApplicantsSection(applicants, cv => cv.education, "**[NO EDUCATION SPECIFIED]**");
-            string projects = ComposeApplicantsSection(applicants, cv => cv.projects, "**[NO PROJECTS SPECIFIED]**");
-            string skills = ComposeApplicantsSection(applicants, cv => cv.skills, "**[NO SKILLS SPECIFIED]**");
-            string languages = ComposeApplicantsSection(applicants, cv => cv.languages, "**[NO LANGUAGES SPECIFIED]**");
+            string workExperiences = applicantsNames + ComposeApplicantsSection(applicants, cv => cv.work_experience, "**[NO WORK EXPERIENCE SPECIFIED]**") + applicantsNames;
+            string educations = applicantsNames + ComposeApplicantsSection(applicants, cv => cv.education, "**[NO EDUCATION SPECIFIED]**") + applicantsNames;
+            string projects = applicantsNames + ComposeApplicantsSection(applicants, cv => cv.projects, "**[NO PROJECTS SPECIFIED]**") + applicantsNames;
+            string skills = applicantsNames + ComposeApplicantsSection(applicants, cv => cv.skills, "**[NO SKILLS SPECIFIED]**") + applicantsNames;
+            string languages = applicantsNames + ComposeApplicantsSection(applicants, cv => cv.languages, "**[NO LANGUAGES SPECIFIED]**") + applicantsNames;
+
+            Console.WriteLine("WORK");
+
+
+
+            // string workExperienceEval;
+            // string[] workExperienceSections;
+            // workExperienceEval = await _openAi.AI_CVEvaluation_Async("work_experience", workExperiences, jobDescription);
+            // workExperienceSections = workExperienceEval.Split(["><"], StringSplitOptions.TrimEntries);
+            // Dictionary<string, ApplicantEvaluation> workExperienceEvaluation = ParseCandidatesEvaluation(workExperienceSections, applicants.Count);
+
+
 
 
             string workExperienceEval;
@@ -494,7 +534,7 @@ namespace ATS.BEST.Controllers
             Dictionary<string, ApplicantEvaluation> workExperienceEvaluation = await RetryOnException<Dictionary<string, ApplicantEvaluation>>(
                 async () => {
                     workExperienceEval = await _openAi.AI_CVEvaluation_Async("work_experience", workExperiences, jobDescription);
-                    workExperienceSections = workExperienceEval.Split(["-----"], StringSplitOptions.TrimEntries);
+                    workExperienceSections = workExperienceEval.Split(["><"], StringSplitOptions.TrimEntries);
                     Console.WriteLine("WORK");
                     return ParseCandidatesEvaluation(workExperienceSections, applicants.Count);
                 },
@@ -508,7 +548,7 @@ namespace ATS.BEST.Controllers
             Dictionary<string, ApplicantEvaluation> projectsEvaluation = await RetryOnException<Dictionary<string, ApplicantEvaluation>>(
                 async () => {
                     projectsEval = await _openAi.AI_CVEvaluation_Async("projects", projects, jobDescription);
-                    projectsSections = projectsEval.Split(["-----"], StringSplitOptions.TrimEntries);
+                    projectsSections = projectsEval.Split(["><"], StringSplitOptions.TrimEntries);
                     Console.WriteLine("PROJECTS");
                     return ParseCandidatesEvaluation(projectsSections, applicants.Count);
                 },
@@ -522,7 +562,7 @@ namespace ATS.BEST.Controllers
             Dictionary<string, ApplicantEvaluation> educationEvaluation = await RetryOnException<Dictionary<string, ApplicantEvaluation>>(
                 async () => {
                     educationEval = await _openAi.AI_CVEvaluation_Async("education", educations, jobDescription);
-                    educationSections = educationEval.Split(["-----"], StringSplitOptions.TrimEntries);
+                    educationSections = educationEval.Split(["><"], StringSplitOptions.TrimEntries);
                     Console.WriteLine("EDUCATION");
                     return ParseCandidatesEvaluation(educationSections, applicants.Count);
                 },
@@ -536,7 +576,7 @@ namespace ATS.BEST.Controllers
             Dictionary<string, ApplicantEvaluation> skillsEvaluation = await RetryOnException<Dictionary<string, ApplicantEvaluation>>(
                 async () => {
                     skillsEval = await _openAi.AI_CVEvaluation_Async("skills", skills, jobDescription);
-                    skillsSections = skillsEval.Split(["-----"], StringSplitOptions.TrimEntries);
+                    skillsSections = skillsEval.Split(["><"], StringSplitOptions.TrimEntries);
                     Console.WriteLine("SKILLS");
                     return ParseCandidatesEvaluation(skillsSections, applicants.Count);
                 },
@@ -550,7 +590,7 @@ namespace ATS.BEST.Controllers
             Dictionary<string, ApplicantEvaluation> languagesEvaluation = await RetryOnException<Dictionary<string, ApplicantEvaluation>>(
                 async () => {
                     languagesEval = await _openAi.AI_CVEvaluation_Async("languages", languages, jobDescription);
-                    languagesSections = languagesEval.Split(["-----"], StringSplitOptions.TrimEntries);
+                    languagesSections = languagesEval.Split(["><"], StringSplitOptions.TrimEntries);
                     Console.WriteLine("LANGUAGES");
                     return ParseCandidatesEvaluation(languagesSections, applicants.Count);
                 },

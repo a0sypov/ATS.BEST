@@ -8,16 +8,23 @@ function toggleJobDetails(id) {
     element.classList.toggle("open");
 }
 
+// Store uploaded files to process them later
+let uploadedFiles = [];
 
 const dropZone = document.getElementById("drop-zone");
 const fileInput = document.getElementById("file-input");
 const jobDescription = document.getElementById("job-description-1");
+const startButton = document.getElementById("start-processing");
+const filesSelectedDiv = document.getElementById("files-selected");
 
 // Open file dialog on click
 dropZone.addEventListener("click", () => fileInput.click());
 
 // Handle files from file dialog
-fileInput.addEventListener("change", () => handleFiles(fileInput.files));
+fileInput.addEventListener("change", () => {
+    uploadedFiles = [...fileInput.files].filter(file => file.type === "application/pdf");
+    updateFilesSelectedDisplay();
+});
 
 // Drag-and-drop functionality
 dropZone.addEventListener("dragover", (e) => {
@@ -33,22 +40,36 @@ dropZone.addEventListener("drop", (e) => {
     e.preventDefault();
     dropZone.style.borderColor = "#999";
     const files = e.dataTransfer.files;
-    handleFiles(files);
+    uploadedFiles = [...files].filter(file => file.type === "application/pdf");
+    updateFilesSelectedDisplay();
 });
 
-function handleFiles(files) {
-    // Show immediate feedback that upload is starting
-    showLoading("Starting file upload...", 1);
-
-    const pdfFiles = [...files].filter(file => file.type === "application/pdf");
-    if (pdfFiles.length === 0) {
-        alert("Please upload only PDF files.");
-        hideLoading();
+// Update display to show selected files
+function updateFilesSelectedDisplay() {
+    if (uploadedFiles.length === 0) {
+        filesSelectedDiv.textContent = "";
         return;
     }
 
+    filesSelectedDiv.textContent = `${uploadedFiles.length} file(s) selected`;
+}
+
+// Add event listener for the start button
+startButton.addEventListener("click", () => {
+    processFiles();
+});
+
+function processFiles() {
+    if (uploadedFiles.length === 0) {
+        alert("Please upload PDF files.");
+        return;
+    }
+
+    // Show immediate feedback that processing is starting
+    showLoading("Starting file processing...", 1);
+
     const formData = new FormData();
-    pdfFiles.forEach((file, index) => {
+    uploadedFiles.forEach((file, index) => {
         formData.append("cvs", file);
         console.log(`Adding file: ${file.name}, size: ${file.size}`);
     });
@@ -154,5 +175,3 @@ function showLoading(message, percentage) {
 function hideLoading() {
     document.getElementById("loadingContainer").style.display = "none";
 }
-
-

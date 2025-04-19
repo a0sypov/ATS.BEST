@@ -14,19 +14,19 @@
     </div>
 
     <div class="user-workspace bordered">
-        
         <div class="job-description-section">
-            <!-- Big text box input area for user to write inside -->
             <textarea id="job-description-1" class="job-description-input" placeholder="Paste job description here..."></textarea>
         </div>
 
         <div class="cv-input" id="drop-zone">
             <input type="file" id="file-input" accept="application/pdf" class="cv-upload-input" multiple />
             <strong>Drop PDF files here or click to upload</strong>
-            <p>Only PDF files are accepted</p>        
+            <p>Only PDF files are accepted</p>
+            <div id="files-selected" class="files-info"></div>
         </div>
-
     </div>
+
+    <button id="start-processing" class="start-button">></button>
 
     <div class="ranked-result bordered">
         <table class="table" id="resultsTable">
